@@ -305,10 +305,12 @@ typedef struct encoder
 	mips_register_t next_register; /**< Следующий обычный регистр для выделения */
 	mips_register_t next_float_register; /**< Следующий регистр с плавающей точкой для выделения */
 
-	size_t label_num;			/**< Номер метки */
-	size_t case_label_num;		/**< Номер метки-перехода по case */
-	label label_continue;		/**< Метка continue */
-	label label_break;			/**< Метка break */
+	size_t label_num;	   /**< Номер метки */
+	size_t case_label_num; /**< Номер метки-перехода по case */
+	label label_continue;  /**< Метка continue */
+	label label_break;	   /**< Метка break */
+	label label_if_true;
+	label label_if_false;
 	size_t curr_function_ident; /**< Идентификатор текущей функций */
 
 	bool registers[22]; /**< Информация о занятых регистрах */
@@ -1737,61 +1739,6 @@ static rvalue emit_operand_load(encoder *const enc, const rvalue *const operand,
 
 
 /**
- *	Emit conditional operation with two rvalues
- *
- *	@param	enc					Encoder
- *  @param  first_operand       First rvalue operand
- *  @param  second_operand      Second rvalue operand
- *  @param  operator            Operator
- *  @param  label_if_true       Label for jump if condition is true
- *  @param  label_if_false      Label for jump if condition is false
- */
-static void emit_conditional_operation(encoder *const enc, const rvalue *const first_operand,
-									   const rvalue *const second_operand, const binary_t operator,
-									   const label * const label_if_true, const label *const label_if_false)
-{
-	assert((operator== BIN_EQ) || (operator== BIN_NE) || (operator== BIN_LT) || (operator== BIN_GT) ||
-		   (operator== BIN_LE) || (operator== BIN_GE));
-
-	if ((first_operand->kind == RVALUE_KIND_REGISTER) && (second_operand->kind == RVALUE_KIND_REGISTER))
-	{
-		const mips_instruction_t instruction = get_bin_instruction(operator, false, false);
-
-
-		if ((operator== BIN_LE) || (operator== BIN_GT))
-		{
-			// we need to reverse order of operands
-			emit_conditional_branch(enc, instruction, second_operand, first_operand, label_if_true);
-		}
-		else
-		{
-			emit_conditional_branch(enc, instruction, first_operand, second_operand, label_if_true);
-		}
-
-		emit_unconditional_branch(enc, IC_RISCV_J, label_if_false);
-	}
-	else
-	{
-		const rvalue real_first_operand = emit_operand_load(enc, first_operand, operator, true);
-		const rvalue real_second_operand = emit_operand_load(enc, second_operand, operator, false);
-		const mips_instruction_t instruction = get_bin_instruction(operator, false, false);
-
-
-		if ((operator== BIN_LE) || (operator== BIN_GT))
-		{
-			// we need to reverse order of operands
-			emit_conditional_branch(enc, instruction, &real_second_operand, &real_first_operand, label_if_true);
-		}
-		else
-		{
-			emit_conditional_branch(enc, instruction, &real_first_operand, &real_second_operand, label_if_true);
-		}
-
-		emit_unconditional_branch(enc, IC_RISCV_J, label_if_false);
-	}
-}
-
-/**
  *	Emit binary operation with two rvalues
  *
  *	@param	enc					Encoder
@@ -1803,9 +1750,6 @@ static void emit_conditional_operation(encoder *const enc, const rvalue *const f
 static void emit_binary_operation(encoder *const enc, const rvalue *const dest, const rvalue *const first_operand,
 								  const rvalue *const second_operand, const binary_t operator)
 {
-	assert((operator!= BIN_EQ) && (operator!= BIN_NE) && (operator!= BIN_LT) && (operator!= BIN_GT) &&
-		   (operator!= BIN_LE) && (operator!= BIN_GE)); // emit_conditional_operation should be used
-
 	assert(operator!= BIN_LOG_AND);
 	assert(operator!= BIN_LOG_OR);
 
@@ -1826,6 +1770,20 @@ static void emit_binary_operation(encoder *const enc, const rvalue *const dest, 
 			case BIN_EQ:
 			case BIN_NE:
 			{
+				const mips_instruction_t instruction = get_bin_instruction(operator, false, false);
+
+
+				if ((operator== BIN_LE) || (operator== BIN_GT))
+				{
+					// we need to reverse order of operands
+					emit_conditional_branch(enc, instruction, second_operand, first_operand, &enc->label_if_true);
+				}
+				else
+				{
+					emit_conditional_branch(enc, instruction, first_operand, second_operand, &enc->label_if_true);
+				}
+
+				emit_unconditional_branch(enc, IC_RISCV_J, &enc->label_if_false);
 			}
 			break;
 
@@ -1860,6 +1818,22 @@ static void emit_binary_operation(encoder *const enc, const rvalue *const dest, 
 			case BIN_EQ:
 			case BIN_NE:
 			{
+				const mips_instruction_t instruction = get_bin_instruction(operator, false, false);
+
+
+				if ((operator== BIN_LE) || (operator== BIN_GT))
+				{
+					// we need to reverse order of operands
+					emit_conditional_branch(enc, instruction, &real_second_operand, &real_first_operand,
+											&enc->label_if_true);
+				}
+				else
+				{
+					emit_conditional_branch(enc, instruction, &real_first_operand, &real_second_operand,
+											&enc->label_if_false);
+				}
+
+				emit_unconditional_branch(enc, IC_RISCV_J, &enc->label_if_false);
 				break;
 			}
 
@@ -2463,18 +2437,24 @@ static rvalue emit_unary_expression(encoder *const enc, const node *const nd)
  *
  *	@return	Rvalue of the result of binary expression
  */
-static rvalue emit_binary_expression(encoder *const enc, const node *const nd, const label *const label_if_true,
-									 const label *const label_if_false)
+static rvalue emit_binary_expression(encoder *const enc, const node *const nd)
 {
 	const binary_t operator= expression_binary_get_operator(nd);
 	const node LHS = expression_binary_get_LHS(nd);
 	const node RHS = expression_binary_get_RHS(nd);
+
+	const label old_label_if_true = enc->label_if_true;
+	const label old_label_if_false = enc->label_if_false;
 
 	switch (operator)
 	{
 		case BIN_COMMA:
 		{
 			emit_void_expression(enc, &LHS);
+
+			enc->label_if_true = old_label_if_true;
+			enc->label_if_false = old_label_if_false;
+
 			return emit_expression(enc, &RHS);
 		}
 		case BIN_LOG_OR:
@@ -2482,14 +2462,23 @@ static rvalue emit_binary_expression(encoder *const enc, const node *const nd, c
 			const item_t curr_label_num = enc->label_num++;
 			const label label_end = { .kind = L_END, .num = (size_t)curr_label_num };
 
-			const rvalue lhs_rvalue = emit_binary_expression(enc, &LHS, label_if_true, &label_end);
+			enc->label_if_true = old_label_if_true;
+			enc->label_if_false = label_end;
+
+			const rvalue lhs_rvalue = emit_expression(enc, &LHS);
 
 			emit_label_declaration(enc, &label_end);
 
 			free_rvalue(enc, &lhs_rvalue);
 
-			const rvalue rhs_rvalue = emit_binary_expression(enc, &RHS, label_if_true, label_if_false);
+			enc->label_if_true = old_label_if_true;
+			enc->label_if_false = old_label_if_false;
+
+			const rvalue rhs_rvalue = emit_expression(enc, &RHS);
 			assert(lhs_rvalue.val.reg_num == rhs_rvalue.val.reg_num);
+
+			enc->label_if_true = old_label_if_true;
+			enc->label_if_false = old_label_if_false;
 
 			return rhs_rvalue;
 		}
@@ -2498,14 +2487,23 @@ static rvalue emit_binary_expression(encoder *const enc, const node *const nd, c
 			const item_t curr_label_num = enc->label_num++;
 			const label label_end = { .kind = L_END, .num = (size_t)curr_label_num };
 
-			const rvalue lhs_rvalue = emit_binary_expression(enc, &LHS, &label_end, label_if_false);
+			enc->label_if_true = label_end;
+			enc->label_if_false = old_label_if_false;
+
+			const rvalue lhs_rvalue = emit_expression(enc, &LHS);
 
 			emit_label_declaration(enc, &label_end);
 
 			free_rvalue(enc, &lhs_rvalue);
 
-			const rvalue rhs_rvalue = emit_binary_expression(enc, &RHS, label_if_true, label_if_false);
+			enc->label_if_true = old_label_if_true;
+			enc->label_if_false = old_label_if_false;
+
+			const rvalue rhs_rvalue = emit_expression(enc, &RHS);
 			assert(lhs_rvalue.val.reg_num == rhs_rvalue.val.reg_num);
+
+			enc->label_if_true = old_label_if_true;
+			enc->label_if_false = old_label_if_false;
 
 			return rhs_rvalue;
 		}
@@ -2515,9 +2513,12 @@ static rvalue emit_binary_expression(encoder *const enc, const node *const nd, c
 			const rvalue lhs_rvalue = emit_expression(enc, &LHS);
 			const rvalue rhs_rvalue = emit_expression(enc, &RHS);
 
-			emit_conditional_operation(enc, &lhs_rvalue, &rhs_rvalue, operator, label_if_true, label_if_false);
+			emit_binary_operation(enc, &lhs_rvalue, &lhs_rvalue, &rhs_rvalue, operator);
 
 			free_rvalue(enc, &rhs_rvalue);
+
+			enc->label_if_true = old_label_if_true;
+			enc->label_if_false = old_label_if_false;
 
 			return lhs_rvalue;
 		}
@@ -2731,7 +2732,6 @@ static rvalue emit_assignment_expression(encoder *const enc, const node *const n
  */
 static rvalue emit_expression(encoder *const enc, const node *const nd)
 {
-	assert(expression_get_class(nd) != EXPR_BINARY); // emit_binary_expression should be used directly
 	if (expression_is_lvalue(nd))
 	{
 		const lvalue lval = emit_lvalue(enc, nd);
@@ -2756,8 +2756,8 @@ static rvalue emit_expression(encoder *const enc, const node *const nd)
 		case EXPR_UNARY:
 			return emit_unary_expression(enc, nd);
 
-			//		case EXPR_BINARY:
-			//			return emit_binary_expression(enc, nd);
+		case EXPR_BINARY:
+			return emit_binary_expression(enc, nd);
 
 		case EXPR_ASSIGNMENT:
 			return emit_assignment_expression(enc, nd);
@@ -3366,8 +3366,14 @@ static void emit_if_statement(encoder *const enc, const node *const nd)
 	const label label_else = { .kind = L_ELSE, .num = label_num };
 	const label label_end = { .kind = L_END, .num = label_num };
 
+	const label old_label_if_true = enc->label_if_true;
+	const label old_label_if_false = enc->label_if_false;
+
+	enc->label_if_true = label_then;
+	enc->label_if_false = label_else;
+
 	const node condition = statement_if_get_condition(nd);
-	const rvalue value = emit_binary_expression(enc, &condition, &label_then, &label_else);
+	const rvalue value = emit_expression(enc, &condition);
 
 	const bool has_else = statement_if_has_else_substmt(nd);
 
@@ -3386,6 +3392,9 @@ static void emit_if_statement(encoder *const enc, const node *const nd)
 	}
 
 	emit_label_declaration(enc, &label_end);
+
+	enc->label_if_true = old_label_if_true;
+	enc->label_if_false = old_label_if_false;
 }
 
 /**
