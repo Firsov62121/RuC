@@ -27,27 +27,27 @@
 #endif
 
 
-static const size_t BUFFER_SIZE = 65536; /**< Размер буфера для тела функции */
-static const size_t HASH_TABLE_SIZE = 1024; /**< Размер хеш-таблицы для смещений и регистров */
-static const bool IS_ON_STACK = true; /**< Хранится ли переменная на стеке */
+static const size_t BUFFER_SIZE = 65536;			/**< Размер буфера для тела функции */
+static const size_t HASH_TABLE_SIZE = 1024;			/**< Размер хеш-таблицы для смещений и регистров */
+static const bool IS_ON_STACK = true;				/**< Хранится ли переменная на стеке */
 
-static const size_t WORD_LENGTH = 4;	  /**< Длина слова данных */
-static const size_t HALF_WORD_LENGTH = 2; /**< Длина половины слова данных */
+static const size_t WORD_LENGTH = 4;				/**< Длина слова данных */
+static const size_t HALF_WORD_LENGTH = 2;			/**< Длина половины слова данных */
 
-static const size_t LOW_DYN_BORDER = 0x10010000; /**< Нижняя граница динамической памяти */
-static const size_t HEAP_DISPL = 8000; /**< Смещение кучи относительно глобальной памяти */
+static const size_t LOW_DYN_BORDER = 0x10010000;	/**< Нижняя граница динамической памяти */
+static const size_t HEAP_DISPL = 8000;				/**< Смещение кучи относительно глобальной памяти */
 
-static const size_t SP_SIZE = 4; /**< Размер регистра sp для его сохранения */
-static const size_t RA_SIZE = 4; /**< Размер регистра ra для его сохранения */
+static const size_t SP_SIZE = 4;					/**< Размер регистра sp для его сохранения */
+static const size_t RA_SIZE = 4;					/**< Размер регистра ra для его сохранения */
 
-static const size_t TEMP_FP_REG_AMOUNT = 12; /**< Количество временных регистров для чисел с плавающей точкой */
-static const size_t TEMP_REG_AMOUNT = 7; /**< Количество обычных временных регистров */
-static const size_t ARG_REG_AMOUNT = 8; /**< Количество регистров-аргументов для функций */
+static const size_t TEMP_FP_REG_AMOUNT = 12;		/**< Количество временных регистров для чисел с плавающей точкой */
+static const size_t TEMP_REG_AMOUNT = 7;			/**< Количество обычных временных регистров */
+static const size_t ARG_REG_AMOUNT = 8;				/**< Количество регистров-аргументов для функций */
 
-static const size_t PRESERVED_REG_AMOUNT = 12; /**< Количество сохраняемых регистров общего назначения */
-static const size_t PRESERVED_FP_REG_AMOUNT = 12; /**< Количество сохраняемых регистров с плавающей точкой */
+static const size_t PRESERVED_REG_AMOUNT = 12;		/**< Количество сохраняемых регистров общего назначения */
+static const size_t PRESERVED_FP_REG_AMOUNT = 12;	/**< Количество сохраняемых регистров с плавающей точкой */
 
-static const bool FROM_LVALUE = 1; /**< Получен ли rvalue из lvalue */
+static const bool FROM_LVALUE = 1;					/**< Получен ли rvalue из lvalue */
 
 /**< Смещение в стеке для сохранения оберегаемых регистров, без учёта оптимизаций */
 static const size_t FUNC_DISPL_PRESEREVED = /* за sp */ 4 + /* за ra */ 4 +
@@ -57,10 +57,10 @@ static const size_t FUNC_DISPL_PRESEREVED = /* за sp */ 4 + /* за ra */ 4 +
 // Назначение регистров взято из документации SYSTEM V APPLICATION BINARY INTERFACE MIPS RISC Processor, 3rd Edition
 typedef enum MIPS_REGISTER
 {
-	R_ZERO, /**< Always has the value 0 */
+	R_ZERO,				/**< Always has the value 0 */
 
 	R_A0,
-	R_A1, /**< Used for expression evaluations and to hold the integer
+	R_A1,				/**< Used for expression evaluations and to hold the integer
 			  and pointer type function return values */
 
 	R_A2,
@@ -68,7 +68,7 @@ typedef enum MIPS_REGISTER
 	R_A4,
 	R_A5,
 	R_A6,
-	R_A7, /**< Used for passing arguments to functions; values are not
+	R_A7,				/**< Used for passing arguments to functions; values are not
 			  preserved across function calls */
 
 	R_T0,
@@ -77,7 +77,7 @@ typedef enum MIPS_REGISTER
 	R_T3,
 	R_T4,
 	R_T5,
-	R_T6, /**< Temporary registers used for expression evaluation;
+	R_T6,				/**< Temporary registers used for expression evaluation;
 			  values are not preserved across function calls */
 
 
@@ -94,10 +94,10 @@ typedef enum MIPS_REGISTER
 	R_S10,
 	R_S11, /**< Saved registers; values are preserved across function calls */
 
-	R_GP, /**< Global pointer and context pointer */
-	R_SP, /**< Stack pointer */
-	R_FP, /**< Saved register (like s0-s7) or frame pointer */
-	R_RA, /**< Return address. The return address is the location to
+	R_GP,				/**< Global pointer and context pointer */
+	R_SP,				/**< Stack pointer */
+	R_FP,				/**< Saved register (like s0-s7) or frame pointer */
+	R_RA,				/**< Return address. The return address is the location to
 			  which a function should return control */
 
 	// Регистры для работы с числами с плавающей точкой
@@ -105,7 +105,7 @@ typedef enum MIPS_REGISTER
 	// - регистр с чётным номером содержит младшие 32 бита числа;
 	// - регистр с нечётным номером содержит старшие 32 бита числа.
 	R_FA0,
-	R_FA1, /**< Used to hold floating-point type function results;
+	R_FA1,              /**< Used to hold floating-point type function results;
 			   single-precision uses f0 and double-precision uses
 			   the register pair f0..f1 */
 
@@ -114,7 +114,7 @@ typedef enum MIPS_REGISTER
 	R_FA4,
 	R_FA5,
 	R_FA6,
-	R_FA7, /**< Used for passing arguments to functions */
+	R_FA7, 				/**< Used for passing arguments to functions */
 
 	R_FT0,
 	R_FT1,
@@ -127,7 +127,7 @@ typedef enum MIPS_REGISTER
 	R_FT8,
 	R_FT9,
 	R_FT10,
-	R_FT11, /**< Temporary registers */
+	R_FT11,				/**< Temporary registers */
 
 	R_FS0,
 	R_FS1,
@@ -140,7 +140,7 @@ typedef enum MIPS_REGISTER
 	R_FS8,
 	R_FS9,
 	R_FS10,
-	R_FS11 /**< Saved registers; their values are preserved across function calls */
+	R_FS11 				/**< Saved registers; their values are preserved across function calls */
 } mips_register_t;
 
 // Назначение команд взято из документации MIPS® Architecture for Programmers
