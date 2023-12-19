@@ -2236,14 +2236,14 @@ static rvalue emit_call_expression(encoder *const enc, const node *const nd)
 		.type = return_type
 	};
 
+	// сохраняем на стеке a0 до обработки аргументов, 
+	// так как он используется также для хранения
+	// возвращаемого значения
 	emit_store_of_rvalue(
 		enc,
 		&ret_lvalue, 
 		&ret
 	);
-
-
-
 
 	for (size_t i = params_amount - 1; i < params_amount ; i--)
 	{
@@ -2293,7 +2293,8 @@ static rvalue emit_call_expression(encoder *const enc, const node *const nd)
 				i < ARG_REG_AMOUNT ? &arg_saved_rvalue : &arg_rvalue
 			);
 		}else if(i == 0){
-			// восстанавливаем a0 со стека
+			// восстанавливаем a0 со стека, поскольку
+			// он мог измениться из-за вложенных вызовов
 			const rvalue tmp_rval = emit_load_of_lvalue(enc, &ret_lvalue);
 
 			emit_move_rvalue_to_register(
