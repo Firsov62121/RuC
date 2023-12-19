@@ -2227,6 +2227,7 @@ static rvalue emit_call_expression(encoder *const enc, const node *const nd)
 		to_code_2R_I(enc->sx->io, IC_RISCV_ADDI, R_SP, R_SP, -(item_t)(displ_for_parameters));
 	}
 
+	assert(params_amount < ARG_REG_AMOUNT);
 	uni_printf(enc->sx->io, "\n\t# passing %zu parameters \n", params_amount);
 
 	const lvalue ret_lvalue = {
@@ -2261,7 +2262,7 @@ static rvalue emit_call_expression(encoder *const enc, const node *const nd)
 		if(i < ARG_REG_AMOUNT){
 			uni_printf(enc->sx->io, "\t# type %zu\n ", arg_rvalue.type);
 			uni_printf(enc->sx->io, "\t# backuping ");
-			mips_register_to_io(enc->sx->io, (R_A0 + i));
+			riscv_register_to_io(enc->sx->io, (R_A0 + i));
 			uni_printf(enc->sx->io, " value on stack:\n");
 		}
 
