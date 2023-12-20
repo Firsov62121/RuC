@@ -2246,7 +2246,7 @@ static rvalue emit_call_expression(encoder *const enc, const node *const nd)
 		&ret
 	);
 
-	for (size_t i = params_amount - 1; i < params_amount ; i--)
+	for (size_t i = params_amount; i-- > 0;) // arguments, from last to first
 	{
 
 		const node arg = expression_call_get_argument(nd, i);
@@ -2287,13 +2287,13 @@ static rvalue emit_call_expression(encoder *const enc, const node *const nd)
 		}; 
 		// сохранение текущего регистра-аргумента на стек
 		// для последующего восстановления
-		if (i>0){
+		if (i > 0) {
 			emit_store_of_rvalue(
 				enc,
 				&tmp_arg_lvalue, 
 				i < ARG_REG_AMOUNT ? &arg_saved_rvalue : &arg_rvalue
 			);
-		}else if(i == 0){
+		} else if (i == 0) {
 			// восстанавливаем a0 со стека, поскольку
 			// он мог измениться из-за вложенных вызовов
 			const rvalue tmp_rval = emit_load_of_lvalue(enc, &ret_lvalue);
@@ -2306,7 +2306,7 @@ static rvalue emit_call_expression(encoder *const enc, const node *const nd)
 			free_rvalue(enc, &tmp_rval);
 		}
 
-		if(i < ARG_REG_AMOUNT){
+		if (i < ARG_REG_AMOUNT) {
 			// теперь записываем в регистры a0-a7 передаваемые аргументы
 
 			emit_move_rvalue_to_register(
@@ -2325,11 +2325,11 @@ static rvalue emit_call_expression(encoder *const enc, const node *const nd)
 	// выполняем прыжок в функцию по относительному смещению (метке)
 	emit_unconditional_branch(enc, IC_RISCV_JAL, &label_func);
 	uni_printf(enc->sx->io, "\n");
-	if(params_amount > 0) uni_printf(enc->sx->io, "\n\t# register restoring:\n");
+	if (params_amount > 0) uni_printf(enc->sx->io, "\n\t# register restoring:\n");
 	
 
 	// восстановление значений регистров a0-a7 со стека 
-	for (size_t i = 1; i < params_amount ; ++i)
+	for (size_t i = 1; i < params_amount; ++i)
 	{
 		uni_printf(enc->sx->io, "\n");
 		// загружаем во временный регистр значение аргумента со стека
